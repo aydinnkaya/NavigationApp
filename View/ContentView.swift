@@ -16,8 +16,11 @@ struct ContentView: View {
     @State private var mapSelection : MKMapItem?
     @State private var showDetails = false
     @State private var getDirections = false
+    @State private var routeDisplaying = false
+    @State private var route : MKRoute?
+    @State private var routeDestination: MKMapItem?
+    
     var body: some View {
-        
         
         Map(position: $cameraPosition, selection : $mapSelection){
             
@@ -32,17 +35,27 @@ struct ContentView: View {
                     Circle()
                         .frame(width: 12, height: 12)
                         .foregroundStyle(.blue)
-                    
                 }
             }
             
             ForEach(results ,id: \.self){ item in
-                let placeMark = item.placemark
-                
-                Marker(placeMark.name ?? "", coordinate: placeMark.coordinate)
-                
-                
+                if routeDisplaying{
+                    if item == routeDestination{
+                        let placeMark = item.placemark
+                        Marker(placeMark.name ?? "", coordinate: placeMark.coordinate)
+                    }
+                }
+                else {
+                    let placeMark = item.placemark
+                    Marker(placeMark.name ?? "", coordinate: placeMark.coordinate)
+                }
             }
+            
+            if let route {
+                MapPolyline(route.polyline)
+                    .stroke(.blue, lineWidth: 6)
+            }
+            
         }
         .overlay(alignment: .top, content: {
             TextField("Search for a location...", text: $searchText)
@@ -56,9 +69,14 @@ struct ContentView: View {
         .onSubmit(of: /*@START_MENU_TOKEN@*/.text/*@END_MENU_TOKEN@*/) {
             Task{await searchPlaces()}
         }
+        .onChange(of: getDirections) { oldValue, newValue in
+            if newValue {
+                print("Debuggg !!!!")
+                fetchRoute()
+            }
+        }
         .onChange(of: mapSelection, { oldValue, newValue in
             showDetails = newValue != nil
-            
         })
         .sheet(isPresented: $showDetails, content: {
             LocationDetailsView(mapSelection: $mapSelection, show: $showDetails, getDirections: getDirections)
@@ -77,24 +95,46 @@ struct ContentView: View {
 
 
 
+
+
+
 extension ContentView{
     func searchPlaces() async {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = searchText
         request.region = .userRegion
         
-        if let result = try? await MKLocalSearch(request: request).start() {
-                   self.results = result.mapItems
-               } else {
-                   self.results = []
-               }
-        
+        let result = try? await MKLocalSearch(request: request).start()
+            self.results = result?.mapItems ?? []
+            }
+    
+       func fetchRoute() {
+        if let mapSelection {
+            let request = MKDirections.Request()
+            request.source = MKMapItem(placemark: .init(coordinate: .userLocation))
+            request.destination = mapSelection
+            
+            Task {
+                let result = try? await MKDirections(request: request).calculate()
+                route = result?.routes.first
+                routeDestination = mapSelection
+                
+                withAnimation(.snappy) {
+                    routeDisplaying = true
+                    showDetails = false
+                    if let rect = route?.polyline.boundingMapRect, routeDisplaying {
+                        cameraPosition = .rect (rect)
+                    }
+                }
+             }
+        }
     }
 }
-
-
 
 
 #Preview {
     ContentView()
 }
+
+
+

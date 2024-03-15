@@ -11,8 +11,8 @@ import SwiftUI
 struct LocationDetailsView: View {
     @Binding var mapSelection : MKMapItem?
     @Binding var show: Bool
-    @State private var lookArroundScene : MKLookAroundScene?
-    @State  var getDirections : Bool
+    @State private var lookAroundScene : MKLookAroundScene?
+    @State var getDirections : Bool
     
     var body: some View {
         VStack{
@@ -44,7 +44,7 @@ struct LocationDetailsView: View {
             .padding(.horizontal)
             .padding(.top)
             
-            if let scene = lookArroundScene {
+            if let scene = lookAroundScene {
                 LookAroundPreview(initialScene: scene)
                     .frame(height: 200)
                     .presentationCornerRadius(12)
@@ -84,6 +84,11 @@ struct LocationDetailsView: View {
             }
             .padding(.horizontal)
         }
+        .task(id: mapSelection){
+             print("DEBUG: did call on Task")
+              await fetchLookAroundPreview()
+          }
+        /*
         .onAppear{
             print("DEBUG: did call on appear")
             fetchLookArroundPreview()
@@ -92,24 +97,23 @@ struct LocationDetailsView: View {
             print("DEBUG: did call on change")
             fetchLookArroundPreview()
         }
-  }
+         */
+    }
 }
 
 
 
 
 extension LocationDetailsView{
-    func fetchLookArroundPreview(){
-    
-        if let mapSelection{
-           lookArroundScene = nil
-            Task{
-                let request = MKLookAroundSceneRequest(mapItem: mapSelection)
-                lookArroundScene = try? await request.scene
-            }
-        }
-        
-    }
+    func  fetchLookAroundPreview() async {
+           if let mapSelection {
+               lookAroundScene = nil
+               Task{
+                   let request = MKLookAroundSceneRequest(mapItem: mapSelection)
+                   lookAroundScene = try? await request.scene
+               }
+           }
+     }
 }
 
 #Preview {
